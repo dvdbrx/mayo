@@ -89,7 +89,8 @@ void BaseMeasureDisplay::adaptGraphics(const OccHandle<Graphic3d_GraphicDriver>&
             // Usage of Aspect_TODT_SUBTITLE is causing a crash when VBO are not available(eg because
             // of too old OpenGL version)
             gfxText->SetDisplayType(useVbo ? Aspect_TODT_SUBTITLE : Aspect_TODT_NORMAL);
-            gfxText->SetColor(useVbo ? Quantity_NOC_WHITE : Quantity_NOC_BLACK);
+            gfxText->SetColorSubTitle(Quantity_NOC_BLACK);
+            gfxText->SetColor(Quantity_NOC_WHITE);
             gfxText->SetTransparency(useVbo ? 0.2 : 0.);
         }
     }
@@ -158,8 +159,10 @@ void BaseMeasureDisplay::applyGraphicsDefaults(IMeasureDisplay* measureDisplay)
         gfxObject->SetZLayer(Graphic3d_ZLayerId_Topmost);
         auto gfxText = OccHandle<AIS_TextLabel>::DownCast(gfxObject);
         if (gfxText) {
-            gfxText->SetDisplayType(Aspect_TODT_NORMAL);
+            gfxText->SetDisplayType(Aspect_TODT_SUBTITLE);
+            gfxText->SetColorSubTitle(Quantity_NOC_BLACK);
             gfxText->SetColor(Quantity_NOC_WHITE);
+            gfxText->SetTransparency(0.2);
         }
         else {
             gfxObject->SetColor(Quantity_NOC_BLACK);
