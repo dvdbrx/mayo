@@ -21,7 +21,13 @@
 #include "../graphics/graphics_utils.h"
 #include "../graphics/opengl_utils.h"
 #include "../gui/gui_application.h"
+#include "../gui/gui_document.h"
 #include "../qtbackend/qt_app_translator.h"
+#include <V3d_View.hxx>
+#include <Image_PixMap.hxx>
+#include <Graphic3d_BufferType.hxx>
+
+
 #include "../qtbackend/qt_signal_thread_helper.h"
 #include "../qtbackend/qsettings_storage.h"
 #include "../qtcommon/filepath_conv.h"
@@ -40,6 +46,7 @@
 #include "widget_model_tree_builder_xde.h"
 #include "widget_occ_view.h"
 #include <common/mayo_version.h>
+#include <common/branding.h>
 
 #include <QtCore/QtDebug>
 #include <QtCore/QCommandLineParser>
@@ -80,7 +87,10 @@ struct CommandLineArguments {
     bool includeDebugLogs = true;
     std::vector<FilePath> listFilepathToOpen;
     bool showSystemInformation = false;
+    FilePath exportScreenshotFilepath;
+    bool exitAfterOpen = false;
 };
+
 
 } // namespace
 
@@ -92,7 +102,7 @@ static CommandLineArguments processCommandLine()
     // Configure command-line parser
     QCommandLineParser cmdParser;
     cmdParser.setApplicationDescription(
-        Main::tr("Mayo the opensource 3D CAD viewer and converter")
+        Main::tr(CADVIEW_APP_DESCRIPTION)
     );
     cmdParser.addHelpOption();
     cmdParser.addVersionOption();
@@ -130,6 +140,40 @@ static CommandLineArguments processCommandLine()
     );
     cmdParser.addOption(cmdSysInfo);
 
+    const QCommandLineOption cmdOptionOpen(
+        QStringList{ "o", "open" },
+        Main::tr("File to open at startup"),
+        Main::tr("filepath")
+    );
+    cmdParser.addOption(cmdOptionOpen);
+
+    const QCommandLineOption cmdOptionScreenshot(
+        QStringList{ "screenshot" },
+        Main::tr("Save screenshot of document view to image file"),
+        Main::tr("filepath")
+    );
+    cmdParser.addOption(cmdOptionScreenshot);
+
+    const QCommandLineOption cmdOptionBackground(
+        QStringList{ "b", "background" },
+        Main::tr("Initial 3D background mode (gradient|dark|light)"),
+        Main::tr("mode")
+    );
+    cmdParser.addOption(cmdOptionBackground);
+
+    const QCommandLineOption cmdOptionDisplay(
+        QStringList{ "d", "display" },
+        Main::tr("Initial model display mode (solid|wireframe|transparent)"),
+        Main::tr("mode")
+    );
+    cmdParser.addOption(cmdOptionDisplay);
+
+    const QCommandLineOption cmdOptionExit(
+        QStringList{ "exit" },
+        Main::tr("Exit application immediately after processing opened files or screenshots")
+    );
+    cmdParser.addOption(cmdOptionExit);
+
     cmdParser.addPositionalArgument(
         Main::tr("files"),
         Main::tr("Files to open at startup, optionally"),
@@ -149,8 +193,36 @@ static CommandLineArguments processCommandLine()
     if (cmdParser.isSet(cmdFileLog))
         args.filepathLog = filepathFrom(cmdParser.value(cmdFileLog));
 
+    if (cmdParser.isSet(cmdOptionOpen))
+        args.listFilepathToOpen.push_back(filepathFrom(cmdParser.value(cmdOptionOpen)));
+
     for (const QString& posArg : cmdParser.positionalArguments())
         args.listFilepathToOpen.push_back(filepathFrom(posArg));
+
+    if (cmdParser.isSet(cmdOptionScreenshot))
+        args.exportScreenshotFilepath = filepathFrom(cmdParser.value(cmdOptionScreenshot));
+
+    args.exitAfterOpen = cmdParser.isSet(cmdOptionExit);
+
+    if (cmdParser.isSet(cmdOptionBackground)) {
+        const QString bg = cmdParser.value(cmdOptionBackground).toLower();
+        if (bg == "dark")
+            GuiDocument::setDefaultBackgroundMode(GuiDocument::BackgroundMode::Dark);
+        else if (bg == "light")
+            GuiDocument::setDefaultBackgroundMode(GuiDocument::BackgroundMode::Light);
+        else if (bg == "gradient")
+            GuiDocument::setDefaultBackgroundMode(GuiDocument::BackgroundMode::Gradient);
+    }
+
+    if (cmdParser.isSet(cmdOptionDisplay)) {
+        const QString disp = cmdParser.value(cmdOptionDisplay).toLower();
+        if (disp == "wireframe")
+            GuiDocument::setDefaultModelDisplayMode(GuiDocument::ModelDisplayMode::Wireframe);
+        else if (disp == "transparent")
+            GuiDocument::setDefaultModelDisplayMode(GuiDocument::ModelDisplayMode::Transparent);
+        else if (disp == "solid")
+            GuiDocument::setDefaultModelDisplayMode(GuiDocument::ModelDisplayMode::Solid);
+    }
 
 #ifdef NDEBUG
     // By default this will exclude debug logs in release build
@@ -421,8 +493,68 @@ static int runApp(QCoreApplication* qtApp)
     });
 
     mainWindow.show();
+
+    auto processCliActions = [&]() {
+        if (!args.exportScreenshotFilepath.empty()) {
+            bool saved = false;
+            GuiDocument* guiDoc = !guiApp->guiDocuments().empty() ? guiApp->guiDocuments().front() : nullptr;
+            if (guiDoc && !guiDoc->v3dView().IsNull()) {
+                guiDoc->v3dView()->FitAll();
+                guiDoc->v3dView()->Redraw();
+                Image_PixMap occPix;
+                occPix.SetTopDown(true);
+                if (guiDoc->v3dView()->ToPixMap(occPix, 1280, 800, Graphic3d_BT_RGBA, true)) {
+                    const QImage img(
+                        occPix.Data(),
+                        int(occPix.Width()),
+                        int(occPix.Height()),
+                        int(occPix.SizeRowBytes()),
+                        QImage::Format_RGBA8888
+                    );
+                    saved = img.save(filepathTo<QString>(args.exportScreenshotFilepath));
+                }
+            }
+            if (!saved) {
+                QPixmap pm = mainWindow.grab();
+                saved = pm.save(filepathTo<QString>(args.exportScreenshotFilepath));
+            }
+            if (saved) {
+                qInfo() << "Screenshot saved to" << filepathTo<QString>(args.exportScreenshotFilepath);
+            } else {
+                qWarning() << "Failed to save screenshot to" << filepathTo<QString>(args.exportScreenshotFilepath);
+            }
+        }
+
+        if (args.exitAfterOpen) {
+            QTimer::singleShot(50, qtApp, [&]{ qtApp->quit(); });
+        }
+    };
+
     if (!args.listFilepathToOpen.empty()) {
+        auto flagExecuted = std::make_shared<bool>(false);
+        auto triggerOnce = [=]() {
+            if (!*flagExecuted) {
+                *flagExecuted = true;
+                processCliActions();
+            }
+        };
+
+        mainWindow.taskMgr()->signalEnded.connectSlot([=, &mainWindow](TaskId) {
+            int runningCount = 0;
+            mainWindow.taskMgr()->foreachTask([&](TaskId) { runningCount++; });
+            if (runningCount <= 1) {
+                QTimer::singleShot(150, qtApp, [=]{ triggerOnce(); });
+            }
+        });
+
+        // Safety timeout fallback
+        QTimer::singleShot(8000, qtApp, [=]{ triggerOnce(); });
+
         QTimer::singleShot(0, qtApp, [&]{ mainWindow.openDocumentsFromList(args.listFilepathToOpen); });
+    } else {
+        if (!args.exportScreenshotFilepath.empty() || args.exitAfterOpen) {
+            QTimer::singleShot(200, qtApp, [=]{ processCliActions(); });
+        }
     }
 
     appModule->settings()->resetAll();
@@ -456,9 +588,9 @@ int main(int argc, char* argv[])
 
     Mayo::QtOpenGlUtils::platformSetup(argc, argv);
 
-    QCoreApplication::setOrganizationName("Fougue");
-    QCoreApplication::setOrganizationDomain("www.fougue.pro");
-    QCoreApplication::setApplicationName("Mayo");
+    QCoreApplication::setOrganizationName(CADVIEW_COMPANY_NAME);
+    QCoreApplication::setOrganizationDomain(CADVIEW_COMPANY_DOMAIN);
+    QCoreApplication::setApplicationName(CADVIEW_PRODUCT_NAME);
     QCoreApplication::setApplicationVersion(QString::fromUtf8(Mayo::strVersion));
     QApplication app(argc, argv);
 

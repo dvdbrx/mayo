@@ -26,7 +26,9 @@
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QProxyStyle>
 #include <QtWidgets/QWidgetAction>
+#include <Standard_Failure.hxx>
 #include <Standard_Version.hxx>
+
 
 namespace Mayo {
 
@@ -131,10 +133,19 @@ WidgetGuiDocument::WidgetGuiDocument(GuiDocument* guiDoc, QWidget* parent)
     m_controller->signalViewScaled.connectSlot([=]{ m_guiDoc->stopViewCameraAnimation(); });
     m_controller->signalMouseButtonClicked.connectSlot([=](Aspect_VKeyMouse btn) {
         if (btn == Aspect_VKeyMouse_LeftButton && !m_guiDoc->processAction(gfxScene->currentHighlightedOwner())) {
-            gfxScene->select();
-            m_qtOccView->redraw();
+            try {
+                gfxScene->select();
+                m_qtOccView->redraw();
+            } catch (const Standard_Failure& err) {
+                qWarning() << "Selection/render error:" << err.GetMessageString();
+            } catch (const std::exception& err) {
+                qWarning() << "Selection/render error:" << err.what();
+            } catch (...) {
+                qWarning() << "Unknown selection error";
+            }
         }
     });
+
     m_controller->signalMultiSelectionToggled.connectSlot([=](bool on) {
         auto mode = on ? GraphicsScene::SelectionMode::Multi : GraphicsScene::SelectionMode::Single;
         gfxScene->setSelectionMode(mode);
@@ -488,4 +499,64 @@ void WidgetGuiDocument::layoutViewControls()
     m_widgetBtns->move(fnGetViewControlsPos());
 }
 
+void WidgetGuiDocument::triggerFitAll()
+{
+    if (m_guiDoc) {
+        m_guiDoc->runViewCameraAnimation([=](OccHandle<V3d_View> view) {
+            auto bndBoxFlags = GuiDocument::OnlySelectedGraphics | GuiDocument::OnlyVisibleGraphics;
+            GraphicsUtils::V3dView_fitAll(view, this->guiDocument()->graphicsBoundingBox(bndBoxFlags));
+        });
+    }
+}
+
+void WidgetGuiDocument::toggleClipPlanes(bool on)
+{
+    if (m_btnEditClipping) {
+        m_btnEditClipping->setChecked(on);
+        this->toggleWidgetClipPlanes(on);
+    }
+}
+
+void WidgetGuiDocument::toggleMeasure(bool on)
+{
+    if (m_btnMeasure) {
+        m_btnMeasure->setChecked(on);
+        this->toggleWidgetMeasure(on);
+    }
+}
+
+bool WidgetGuiDocument::isMeasureActive() const
+{
+    return m_btnMeasure && m_btnMeasure->isChecked();
+}
+
+void WidgetGuiDocument::setBackgroundMode(GuiDocument::BackgroundMode mode)
+{
+    if (m_guiDoc) {
+        m_guiDoc->setBackgroundMode(mode);
+        if (m_qtOccView)
+            m_qtOccView->redraw();
+    }
+}
+
+GuiDocument::BackgroundMode WidgetGuiDocument::backgroundMode() const
+{
+    return m_guiDoc ? m_guiDoc->backgroundMode() : GuiDocument::defaultBackgroundMode();
+}
+
+void WidgetGuiDocument::setModelDisplayMode(GuiDocument::ModelDisplayMode mode)
+{
+    if (m_guiDoc) {
+        m_guiDoc->setModelDisplayMode(mode);
+        if (m_qtOccView)
+            m_qtOccView->redraw();
+    }
+}
+
+GuiDocument::ModelDisplayMode WidgetGuiDocument::modelDisplayMode() const
+{
+    return m_guiDoc ? m_guiDoc->modelDisplayMode() : GuiDocument::defaultModelDisplayMode();
+}
+
 } // namespace Mayo
+

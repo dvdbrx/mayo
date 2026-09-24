@@ -12,6 +12,8 @@
 #include "../src/base/task_progress.h"
 #include "../src/base/unit_system.h"
 #include "../src/io_occ/io_occ_stl.h"
+#include "../src/io_occ/io_occ_step.h"
+#include "../src/qtcommon/filepath_conv.h"
 #include "../src/measure/measure_tool_brep.h"
 
 #include <BRep_Builder.hxx>
@@ -27,6 +29,11 @@
 #include <GC_MakeEllipse.hxx>
 #include <TopoDS_Edge.hxx>
 #include <TopoDS_Vertex.hxx>
+#include <TopoDS.hxx>
+#include <TopExp_Explorer.hxx>
+#include <GProp_GProps.hxx>
+#include <BRepGProp.hxx>
+
 
 #include <QtCore/QtDebug>
 #include <cmath>
@@ -261,6 +268,63 @@ void TestMeasure::BRepBoundingBox_NullShape_test()
     const TopoDS_Shape nullShape;
     MAYO_QVERIFY_THROWS_EXCEPTION(IMeasureError, MeasureToolBRep::brepBoundingBox(nullShape));
 }
+
+void TestMeasure::Fixture_F1_Oracles_test()
+{
+    auto progress = &TaskProgress::null();
+    IO::OccStepReader reader;
+    QString path = "tests/fixtures/F1.step";
+    if (!QFileInfo::exists(path))
+        path = "../tests/fixtures/F1.step";
+    if (!QFileInfo::exists(path))
+        path = "../../tests/fixtures/F1.step";
+
+    QVERIFY(QFileInfo::exists(path));
+    const bool okRead = reader.readFile(filepathFrom(path), progress);
+    QVERIFY(okRead);
+
+    auto app = makeOccHandle<Application>();
+    auto doc = app->newDocument();
+    const NCollection_Sequence<TDF_Label> seqLabel = reader.transfer(doc, progress);
+    QVERIFY(!seqLabel.IsEmpty());
+
+    const TopoDS_Shape shape = doc->xcaf().shape(seqLabel.First());
+    QVERIFY(!shape.IsNull());
+
+    // Bounding Box
+    const MeasureBoundingBox bndBox = MeasureToolBRep::brepBoundingBox(shape);
+    const double dx = double(UnitSystem::millimeters(bndBox.xLength));
+    const double dy = double(UnitSystem::millimeters(bndBox.yLength));
+    const double dz = double(UnitSystem::millimeters(bndBox.zLength));
+
+    qDebug() << "Fixture F1 Bounding Box:" << "dx=" << dx << "dy=" << dy << "dz=" << dz;
+    QVERIFY(std::abs(dx - 50.8) < 0.01);
+    QVERIFY(std::abs(dy - 190.5) < 0.01);
+    QVERIFY(std::abs(dz - 6.35) < 0.01);
+
+    // Measure individual faces with brepArea
+    int faceCount = 0;
+    double sumFaceArea = 0.0;
+    for (TopExp_Explorer exp(shape, TopAbs_FACE); exp.More(); exp.Next()) {
+        const TopoDS_Face face = TopoDS::Face(exp.Current());
+        const MeasureArea faceArea = MeasureToolBRep::brepArea(face);
+        const double a = double(UnitSystem::squareMillimeters(faceArea.value));
+        QVERIFY(a > 0.0);
+        sumFaceArea += a;
+        ++faceCount;
+    }
+    qDebug() << "Fixture F1 Face count:" << faceCount << "Sum face area (mm2):" << sumFaceArea;
+    QVERIFY(faceCount > 0);
+    QVERIFY(sumFaceArea > 0.0);
+
+    // Measure total surface properties
+    GProp_GProps gprops;
+    BRepGProp::SurfaceProperties(shape, gprops);
+    const double totalArea = gprops.Mass();
+    qDebug() << "Fixture F1 Total Surface Area (mm2):" << totalArea;
+    QVERIFY(std::abs(sumFaceArea - totalArea) < 0.01);
+}
+
 
 } // namespace Mayo
 

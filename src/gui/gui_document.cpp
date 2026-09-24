@@ -57,7 +57,9 @@ static OccHandle<AIS_Trihedron> createOriginTrihedron()
 static GuiDocument::GradientBackground& defaultGradientBackground()
 {
     static GuiDocument::GradientBackground defaultGradientBackground{
-        Quantity_NOC_GRAY50, Quantity_NOC_GRAY60, Aspect_GFM_VER
+        Quantity_Color(95 / 255.0, 120 / 255.0, 150 / 255.0, Quantity_TOC_sRGB),
+        Quantity_Color(218 / 255.0, 222 / 255.0, 228 / 255.0, Quantity_TOC_sRGB),
+        Aspect_GFM_VER
     };
     return defaultGradientBackground;
 }
@@ -118,18 +120,19 @@ GuiDocument::GuiDocument(const DocumentPtr& doc, GuiApplication* guiApp)
     // NOTE
     // Graphic3d_RenderingParams::IsAntialiasingEnabled is applicable only when Method==Graphic3d_RM_RAYTRACING
 
-    // 3D view - Set gradient background
-    m_v3dView->SetBgGradientColors(
-        GuiDocument::defaultGradientBackground().color1,
-        GuiDocument::defaultGradientBackground().color2,
-        GuiDocument::defaultGradientBackground().fillStyle
-    );
+    // 3D view - Set background and model display mode
+    m_backgroundMode = defaultBackgroundMode();
+    this->setBackgroundMode(m_backgroundMode);
+    m_modelDisplayMode = defaultModelDisplayMode();
     //m_v3dView->SetShadingModel(Graphic3d_TOSM_PBR);
+
 
     m_cameraAnimation->setView(m_v3dView);
 
     for (TreeNodeId nodeId : doc->allEntityNodeIds())
         this->mapEntity(nodeId);
+
+    this->setModelDisplayMode(m_modelDisplayMode);
 
     doc->signalEntityAdded.connectSlot(&GuiDocument::onDocumentEntityAdded, this);
     doc->signalEntityAboutToBeDestroyed.connectSlot(&GuiDocument::onDocumentEntityAboutToBeDestroyed, this);
@@ -565,6 +568,102 @@ void GuiDocument::setDefaultGradientBackground(const GradientBackground& gradien
     Internal::defaultGradientBackground() = gradientBkgnd;
 }
 
+namespace Internal {
+
+static GuiDocument::BackgroundMode& globalDefaultBackgroundMode()
+{
+    static GuiDocument::BackgroundMode mode = GuiDocument::BackgroundMode::Gradient;
+    return mode;
+}
+
+static GuiDocument::ModelDisplayMode& globalDefaultModelDisplayMode()
+{
+    static GuiDocument::ModelDisplayMode mode = GuiDocument::ModelDisplayMode::Solid;
+    return mode;
+}
+
+} // namespace Internal
+
+GuiDocument::BackgroundMode GuiDocument::defaultBackgroundMode()
+{
+    return Internal::globalDefaultBackgroundMode();
+}
+
+void GuiDocument::setDefaultBackgroundMode(BackgroundMode mode)
+{
+    Internal::globalDefaultBackgroundMode() = mode;
+}
+
+GuiDocument::ModelDisplayMode GuiDocument::defaultModelDisplayMode()
+{
+    return Internal::globalDefaultModelDisplayMode();
+}
+
+void GuiDocument::setDefaultModelDisplayMode(ModelDisplayMode mode)
+{
+    Internal::globalDefaultModelDisplayMode() = mode;
+}
+
+void GuiDocument::setBackgroundMode(BackgroundMode mode)
+{
+    m_backgroundMode = mode;
+    if (m_v3dView.IsNull())
+        return;
+
+    if (mode == BackgroundMode::Light) {
+        const Quantity_Color color(0.92, 0.93, 0.95, Quantity_TOC_sRGB);
+        m_v3dView->SetBackgroundColor(color);
+        m_v3dView->SetBgGradientColors(color, color, Aspect_GFM_VER, false);
+        m_v3dView->SetBgGradientStyle(Aspect_GFM_NONE, false);
+    }
+    else if (mode == BackgroundMode::Dark) {
+        const Quantity_Color color(0.12, 0.13, 0.15, Quantity_TOC_sRGB);
+        m_v3dView->SetBackgroundColor(color);
+        m_v3dView->SetBgGradientColors(color, color, Aspect_GFM_VER, false);
+        m_v3dView->SetBgGradientStyle(Aspect_GFM_NONE, false);
+    }
+    else { // Gradient
+        m_v3dView->SetBgGradientColors(
+            GuiDocument::defaultGradientBackground().color1,
+            GuiDocument::defaultGradientBackground().color2,
+            GuiDocument::defaultGradientBackground().fillStyle,
+            false
+        );
+        m_v3dView->SetBgGradientStyle(GuiDocument::defaultGradientBackground().fillStyle, false);
+    }
+    this->graphicsView().redraw();
+}
+
+void GuiDocument::setModelDisplayMode(ModelDisplayMode mode)
+{
+    m_modelDisplayMode = mode;
+    auto ctx = m_gfxScene.aisContextPtr();
+    if (!ctx)
+        return;
+
+    m_gfxScene.foreachDisplayedObject([=](const GraphicsObjectPtr& gfxObj) {
+        if (GuiDocument::isAisViewCubeObject(gfxObj))
+            return;
+
+        if (mode == ModelDisplayMode::Wireframe) {
+            ctx->SetDisplayMode(gfxObj, AIS_WireFrame, false);
+            ctx->UnsetTransparency(gfxObj, false);
+        }
+        else if (mode == ModelDisplayMode::Transparent) {
+            ctx->SetDisplayMode(gfxObj, AIS_Shaded, false);
+            ctx->SetTransparency(gfxObj, 0.55, false);
+        }
+        else { // Solid
+            ctx->SetDisplayMode(gfxObj, AIS_Shaded, false);
+            ctx->UnsetTransparency(gfxObj, false);
+        }
+    });
+
+    ctx->UpdateCurrentViewer();
+    this->graphicsView().redraw();
+}
+
+
 void GuiDocument::onDocumentEntityAdded(TreeNodeId entityTreeNodeId)
 {
     this->mapEntity(entityTreeNodeId);
@@ -682,7 +781,21 @@ void GuiDocument::mapEntity(TreeNodeId entityTreeNodeId)
         auto driver = GraphicsObjectDriver::get(object.ptr);
         if (driver)
             driver->applyDisplayMode(object.ptr, this->activeDisplayMode(driver));
+
+        if (m_modelDisplayMode == ModelDisplayMode::Wireframe) {
+            m_gfxScene.aisContextPtr()->SetDisplayMode(object.ptr, AIS_WireFrame, false);
+            m_gfxScene.aisContextPtr()->UnsetTransparency(object.ptr, false);
+        }
+        else if (m_modelDisplayMode == ModelDisplayMode::Transparent) {
+            m_gfxScene.aisContextPtr()->SetDisplayMode(object.ptr, AIS_Shaded, false);
+            m_gfxScene.aisContextPtr()->SetTransparency(object.ptr, 0.55, false);
+        }
+        else {
+            m_gfxScene.aisContextPtr()->SetDisplayMode(object.ptr, AIS_Shaded, false);
+            m_gfxScene.aisContextPtr()->UnsetTransparency(object.ptr, false);
+        }
     }
+
 
     for (GraphicsEntity::Object& object : gfxEntity.vecObject) {
         object.bndBox = GraphicsUtils::AisObject_boundingBox(object.ptr);

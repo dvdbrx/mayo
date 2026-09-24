@@ -288,9 +288,9 @@ public:
         case Theme::Color::Graphic3d_AspectFillArea:
             return QColor{128, 200, 255};
         case Theme::Color::View3d_BackgroundGradientStart:
-            return QColor{128, 148, 255};
+            return QColor{95, 120, 150};
         case Theme::Color::View3d_BackgroundGradientEnd:
-            return Qt::white;
+            return QColor{218, 222, 228};
         case Theme::Color::RubberBandView3d_Line:
             return QColor{65, 200, 250};
         case Theme::Color::RubberBandView3d_Fill:
@@ -362,9 +362,9 @@ public:
         case Theme::Color::Graphic3d_AspectFillArea:
             return appPalette.color(QPalette::Highlight);
         case Theme::Color::View3d_BackgroundGradientStart:
-            return QColor{100, 100, 100};
+            return QColor{95, 120, 150};
         case Theme::Color::View3d_BackgroundGradientEnd:
-            return QColor{200, 200, 200};
+            return QColor{218, 222, 228};
         case Theme::Color::RubberBandView3d_Line:
             return appPalette.color(QPalette::Highlight);
         case Theme::Color::RubberBandView3d_Fill:

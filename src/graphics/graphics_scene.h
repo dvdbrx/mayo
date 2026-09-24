@@ -108,9 +108,9 @@ public:
     Signal<> signalSelectionModeChanged;
     Signal<const OccHandle<V3d_View>&> signalRedrawRequested;
 
-private:
     AIS_InteractiveContext* aisContextPtr() const;
 
+private:
     class Private;
     Private* const d = nullptr;
 };

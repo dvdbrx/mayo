@@ -13,8 +13,10 @@
 #include "../measure/measure_tool_brep.h"
 #include "../qtcommon/qstring_conv.h"
 
+#include <Standard_Failure.hxx>
 #include <QtCore/QtDebug>
 #include <QtGui/QFontDatabase>
+
 
 namespace Mayo {
 
@@ -336,47 +338,77 @@ void WidgetMeasure::onGraphicsSelectionChanged()
     const MeasureType measureType = this->currentMeasureType();
     // Create MeasureDisplay objects needing a newly single selected graphics object
     for (const GraphicsOwnerPtr& owner : vecNewSelected) {
+        if (!owner)
+            continue;
         try {
             const MeasureValue value = IMeasureTool_computeValue(*m_tool, measureType, owner);
             if (MeasureValue_isValid(value))
                 fnAddMeasureDisplay(BaseMeasureDisplay::createFrom(measureType, value), { owner });
         } catch (const IMeasureError& err) {
             m_errorMessage = to_QString(err.message());
+        } catch (const Standard_Failure& err) {
+            m_errorMessage = QString::fromUtf8(err.GetMessageString());
+        } catch (const std::exception& err) {
+            m_errorMessage = QString::fromUtf8(err.what());
+        } catch (...) {
+            m_errorMessage = tr("Measurement error");
         }
     }
 
     // Create MeasureDisplay objects needing currently two selected graphics objects
     if (vecSelectedOwner_onEntry.size() >= 1) {
         for (const GraphicsOwnerPtr& owner : vecNewSelected) {
+            if (!owner)
+                continue;
             const int indexOwner = Cpp::indexInSpan(vecNewSelected, owner);
             const GraphicsOwnerPtr& prevOwner =
                 indexOwner == 0 ?
                     vecSelectedOwner_onEntry.back() :
                     vecNewSelected.at(indexOwner - 1)
                 ;
+            if (!prevOwner)
+                continue;
             try {
                 const MeasureValue value = IMeasureTool_computeValue(*m_tool, measureType, prevOwner, owner);
                 if (MeasureValue_isValid(value))
                     fnAddMeasureDisplay(BaseMeasureDisplay::createFrom(measureType, value), { prevOwner, owner });
             } catch (const IMeasureError& err) {
                 m_errorMessage = to_QString(err.message());
+            } catch (const Standard_Failure& err) {
+                m_errorMessage = QString::fromUtf8(err.GetMessageString());
+            } catch (const std::exception& err) {
+                m_errorMessage = QString::fromUtf8(err.what());
+            } catch (...) {
+                m_errorMessage = tr("Measurement error");
             }
         }
     }
 
     // Display new measure graphics objects
-    auto measureDisplayConfig = this->currentMeasureDisplayConfig();
-    for (IMeasureDisplayPtr& measure : vecNewMeasureDisplay) {
-        measure->update(measureDisplayConfig);
-        measure->adaptGraphics(gfxScene->v3dViewer()->Driver());
-        foreachGraphicsObject(measure, [=](const GraphicsObjectPtr& gfxObject) {
-            gfxScene->addObject(gfxObject, GraphicsScene::AddObjectDisableSelectionMode);
-        });
+    try {
+        auto measureDisplayConfig = this->currentMeasureDisplayConfig();
+        for (IMeasureDisplayPtr& measure : vecNewMeasureDisplay) {
+            if (!measure)
+                continue;
+            measure->update(measureDisplayConfig);
+            measure->adaptGraphics(gfxScene->v3dViewer()->Driver());
+            foreachGraphicsObject(measure, [=](const GraphicsObjectPtr& gfxObject) {
+                if (gfxObject)
+                    gfxScene->addObject(gfxObject, GraphicsScene::AddObjectDisableSelectionMode);
+            });
 
-        m_vecMeasureDisplay.push_back(std::move(measure));
+            m_vecMeasureDisplay.push_back(std::move(measure));
+        }
+    } catch (const Standard_Failure& err) {
+        m_errorMessage = QString::fromUtf8(err.GetMessageString());
+    } catch (const std::exception& err) {
+        m_errorMessage = QString::fromUtf8(err.what());
+    } catch (...) {
+        m_errorMessage = tr("Display error");
     }
 
     this->updateMessagePanel();
+
 }
 
 void WidgetMeasure::onDocumentEntityAdded(TreeNodeId entityNodeId)

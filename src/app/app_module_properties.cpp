@@ -115,7 +115,7 @@ AppModuleProperties::AppModuleProperties(Settings* settings)
         this->forceOpenGlFallbackWidget.setValue(false);
     });
     settings->addResetFunction(groupId_graphics, [this]{
-        this->navigationStyle.setValue(View3dNavigationStyle::Mayo);
+        this->navigationStyle.setValue(View3dNavigationStyle::SolidWorks);
         this->viewCubeCorner.setValue(Aspect_TOTP_LEFT_LOWER);
         this->defaultShowOriginTrihedron.setValue(true);
         this->instantZoomFactor.setValue(5.);

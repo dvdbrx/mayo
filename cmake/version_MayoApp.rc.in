@@ -13,14 +13,14 @@ BEGIN
     BEGIN
         BLOCK "040904B0"
         BEGIN
-            VALUE "CompanyName",      "@Mayo_CompanyName@"
-            VALUE "FileDescription",  "@MayoApp_Description@"
+            VALUE "CompanyName",      "@CADVIEW_COMPANY_NAME@"
+            VALUE "FileDescription",  "@CADVIEW_APP_DESCRIPTION@"
             VALUE "FileVersion",      "@Mayo_Version@"
-            VALUE "InternalName",     "mayo"
-            VALUE "OriginalFilename", "mayo.exe"
-            VALUE "ProductName",      "Mayo"
+            VALUE "InternalName",     "cadview"
+            VALUE "OriginalFilename", "cadview.exe"
+            VALUE "ProductName",      "@CADVIEW_PRODUCT_NAME@"
             VALUE "ProductVersion",   "@Mayo_Version@"
-            VALUE "LegalCopyright",   "@Mayo_Copyright@"
+            VALUE "LegalCopyright",   "Copyright (c) 2026, @CADVIEW_COMPANY_NAME@"
         END
     END
 

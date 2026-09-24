@@ -158,16 +158,15 @@ void BaseMeasureDisplay::applyGraphicsDefaults(IMeasureDisplay* measureDisplay)
         gfxObject->SetZLayer(Graphic3d_ZLayerId_Topmost);
         auto gfxText = OccHandle<AIS_TextLabel>::DownCast(gfxObject);
         if (gfxText) {
-            gfxText->SetDisplayType(Aspect_TODT_SUBTITLE);
-            gfxText->SetColorSubTitle(Quantity_NOC_BLACK);
+            gfxText->SetDisplayType(Aspect_TODT_NORMAL);
             gfxText->SetColor(Quantity_NOC_WHITE);
-            gfxText->SetTransparency(0.2);
         }
         else {
             gfxObject->SetColor(Quantity_NOC_BLACK);
         }
     }
 }
+
 
 // --
 // -- Vertex

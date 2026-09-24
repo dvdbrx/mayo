@@ -37,6 +37,8 @@ private slots:
 
     void BRepBoundingBox_Sphere_test();
     void BRepBoundingBox_NullShape_test();
+
+    void Fixture_F1_Oracles_test();
 };
 
 } // namespace Mayo

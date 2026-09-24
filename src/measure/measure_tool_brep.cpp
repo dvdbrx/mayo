@@ -116,7 +116,13 @@ template<ErrorCode Err> void throwErrorIf(bool cond)
 
 TopoDS_Shape getShape(const GraphicsOwnerPtr& owner)
 {
+    if (!owner)
+        return {};
+
     auto brepOwner = OccHandle<StdSelect_BRepOwner>::DownCast(owner);
+    if (!brepOwner || !brepOwner->HasShape())
+        return {};
+
     TopLoc_Location ownerLoc = owner->Location();
 #if OCC_VERSION_HEX >= 0x070600
     // Force scale factor to 1
@@ -130,8 +136,9 @@ TopoDS_Shape getShape(const GraphicsOwnerPtr& owner)
         ownerLoc = trsf;
     }
 #endif
-    return brepOwner ? brepOwner->Shape().Moved(ownerLoc) : TopoDS_Shape{};
+    return brepOwner->Shape().Moved(ownerLoc);
 }
+
 
 gp_Pnt computeShapeCenter(const TopoDS_Shape& shape)
 {

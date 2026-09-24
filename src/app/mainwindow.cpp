@@ -24,6 +24,9 @@
 #include "widget_main_control.h"
 #include "widget_main_home.h"
 #include "widget_message_indicator.h"
+#include "app_module.h"
+#include "app_module_properties.h"
+#include "../base/unit_system.h"
 
 #ifdef Q_OS_WIN
 #  include "win_taskbar_global_progress.h"
@@ -32,10 +35,17 @@
 #include <QtDebug>
 #include <QtGui/QFontMetrics>
 #include <QtWidgets/QDialogButtonBox>
+#include <QtCore/QSignalBlocker>
+#include <QtWidgets/QComboBox>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QPushButton>
 #include <QtWidgets/QScrollArea>
 #include <QtWidgets/QStyle>
+#include <QtWidgets/QToolBar>
+#include <QtWidgets/QToolButton>
+#include <QtWidgets/QStatusBar>
+#include "../qtcommon/filepath_conv.h"
+#include "widget_gui_document.h"
 
 namespace Mayo {
 
@@ -55,6 +65,7 @@ MainWindow::MainWindow(GuiApplication* guiApp, QWidget* parent)
     // Some commands requires WidgetMainControl UI page to exist, ensure it has been created beforehand
     this->createCommands();
     this->createMenus();
+    this->createToolbarAndStatusBar();
 
     // WidgetMainControl page depends on some Command objects, ensure they have been created beforehand
     for (auto [code, page] : m_mapWidgetPage)
@@ -159,15 +170,13 @@ void MainWindow::createMenus()
 
     {   // File
         auto menu = m_ui->menu_File;
-        fnAddAction(menu, CommandNewDocument::Name);
         fnAddAction(menu, CommandOpenDocuments::Name);
         fnAddAction(menu, CommandRecentFiles::Name);
         menu->addSeparator();
-        fnAddAction(menu, CommandImportInCurrentDocument::Name);
+        fnAddAction(menu, CommandSaveViewImage::Name);
         fnAddAction(menu, CommandExportSelectedApplicationItems::Name);
         menu->addSeparator();
         fnAddAction(menu, CommandCloseCurrentDocument::Name);
-        fnAddAction(menu, CommandCloseAllDocumentsExceptCurrent::Name);
         fnAddAction(menu, CommandCloseAllDocuments::Name);
         menu->addSeparator();
         fnAddAction(menu, CommandQuitApplication::Name);
@@ -210,6 +219,166 @@ void MainWindow::createMenus()
         fnAddAction(menu, CommandSystemInformation::Name);
         menu->addSeparator();
         fnAddAction(menu, CommandAbout::Name);
+    }
+}
+
+void MainWindow::createToolbarAndStatusBar()
+{
+    auto toolBar = this->addToolBar(tr("Main"));
+    toolBar->setMovable(false);
+    toolBar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+
+    // Open
+    auto actionOpen = m_cmdContainer.findCommandAction(CommandOpenDocuments::Name);
+    toolBar->addAction(actionOpen);
+
+    toolBar->addSeparator();
+
+    // Fit
+    auto actionFit = toolBar->addAction(mayoTheme()->icon(Theme::Icon::Expand), tr("Fit All"));
+    QObject::connect(actionFit, &QAction::triggered, this, [=]{
+        auto widgetDoc = this->widgetPageDocuments() ? this->widgetPageDocuments()->currentWidgetGuiDocument() : nullptr;
+        if (widgetDoc)
+            widgetDoc->triggerFitAll();
+    });
+
+    // Section (Clip Planes)
+    auto actionSection = toolBar->addAction(mayoTheme()->icon(Theme::Icon::ClipPlane), tr("Section"));
+    actionSection->setCheckable(true);
+    QObject::connect(actionSection, &QAction::triggered, this, [=](bool on){
+        auto widgetDoc = this->widgetPageDocuments() ? this->widgetPageDocuments()->currentWidgetGuiDocument() : nullptr;
+        if (widgetDoc)
+            widgetDoc->toggleClipPlanes(on);
+    });
+
+    // Measure
+    auto actionMeasure = toolBar->addAction(mayoTheme()->icon(Theme::Icon::Measure), tr("Measure"));
+    actionMeasure->setCheckable(true);
+    QObject::connect(actionMeasure, &QAction::triggered, this, [=](bool on){
+        auto widgetDoc = this->widgetPageDocuments() ? this->widgetPageDocuments()->currentWidgetGuiDocument() : nullptr;
+        if (widgetDoc)
+            widgetDoc->toggleMeasure(on);
+    });
+
+    toolBar->addSeparator();
+
+    // Model display mode (Solid / Wireframe / Transparent)
+    auto comboDisplay = new QComboBox(toolBar);
+    mayoTheme()->setupHeaderComboBox(comboDisplay);
+    comboDisplay->setFocusPolicy(Qt::NoFocus);
+    comboDisplay->addItem(tr("Display: Solid"), static_cast<int>(GuiDocument::ModelDisplayMode::Solid));
+    comboDisplay->addItem(tr("Display: Wireframe"), static_cast<int>(GuiDocument::ModelDisplayMode::Wireframe));
+    comboDisplay->addItem(tr("Display: Transparent"), static_cast<int>(GuiDocument::ModelDisplayMode::Transparent));
+    comboDisplay->setToolTip(tr("Model display mode (Solid / Wireframe / Transparent)"));
+    QObject::connect(comboDisplay, qOverload<int>(&QComboBox::currentIndexChanged), this, [=](int index) {
+        if (index < 0)
+            return;
+
+        auto mode = static_cast<GuiDocument::ModelDisplayMode>(comboDisplay->itemData(index).toInt());
+        GuiDocument::setDefaultModelDisplayMode(mode);
+        auto widgetDoc = this->widgetPageDocuments() ? this->widgetPageDocuments()->currentWidgetGuiDocument() : nullptr;
+        if (widgetDoc)
+            widgetDoc->setModelDisplayMode(mode);
+    });
+    toolBar->addWidget(comboDisplay);
+
+    // Background mode (Gradient / Dark / Light)
+    auto comboBackground = new QComboBox(toolBar);
+    mayoTheme()->setupHeaderComboBox(comboBackground);
+    comboBackground->setFocusPolicy(Qt::NoFocus);
+    comboBackground->addItem(tr("Background: Gradient"), static_cast<int>(GuiDocument::BackgroundMode::Gradient));
+    comboBackground->addItem(tr("Background: Dark"), static_cast<int>(GuiDocument::BackgroundMode::Dark));
+    comboBackground->addItem(tr("Background: Light"), static_cast<int>(GuiDocument::BackgroundMode::Light));
+    comboBackground->setToolTip(tr("3D background (Gradient / Dark / Light)"));
+    QObject::connect(comboBackground, qOverload<int>(&QComboBox::currentIndexChanged), this, [=](int index) {
+        if (index < 0)
+            return;
+
+        auto mode = static_cast<GuiDocument::BackgroundMode>(comboBackground->itemData(index).toInt());
+        GuiDocument::setDefaultBackgroundMode(mode);
+        auto widgetDoc = this->widgetPageDocuments() ? this->widgetPageDocuments()->currentWidgetGuiDocument() : nullptr;
+        if (widgetDoc)
+            widgetDoc->setBackgroundMode(mode);
+    });
+    toolBar->addWidget(comboBackground);
+
+    toolBar->addSeparator();
+
+    // Unit toggle (mm / in)
+    auto btnUnit = new QToolButton(toolBar);
+    btnUnit->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    auto fnUpdateUnitButton = [=]{
+        auto schema = AppModule::get()->properties()->unitSystemSchema.value();
+        btnUnit->setText(schema == UnitSystem::SI ? tr("Unit: mm") : tr("Unit: in"));
+    };
+    fnUpdateUnitButton();
+    QObject::connect(btnUnit, &QToolButton::clicked, this, [=]{
+        auto schema = AppModule::get()->properties()->unitSystemSchema.value();
+        auto newSchema = (schema == UnitSystem::SI) ? UnitSystem::ImperialUK : UnitSystem::SI;
+        AppModule::get()->properties()->unitSystemSchema.setValue(newSchema);
+        fnUpdateUnitButton();
+    });
+    toolBar->addWidget(btnUnit);
+
+    // Status bar
+    auto status = this->statusBar();
+    auto labelFile = new QLabel(this);
+    auto labelUnits = new QLabel(this);
+    auto labelStatus = new QLabel(tr("Ready"), this);
+
+    status->addWidget(labelFile, 1);
+    status->addPermanentWidget(labelStatus);
+    status->addPermanentWidget(labelUnits);
+
+    auto fnUpdateStatus = [=]{
+        auto schema = AppModule::get()->properties()->unitSystemSchema.value();
+        labelUnits->setText(schema == UnitSystem::SI ? tr("[Units: mm]") : tr("[Units: in]"));
+
+        auto widgetDoc = this->widgetPageDocuments() ? this->widgetPageDocuments()->currentWidgetGuiDocument() : nullptr;
+        if (widgetDoc && widgetDoc->guiDocument() && widgetDoc->guiDocument()->document()) {
+            labelFile->setText(filepathTo<QString>(widgetDoc->guiDocument()->document()->filePath()));
+        } else {
+            labelFile->setText(tr("No file open"));
+        }
+    };
+    fnUpdateStatus();
+
+    auto fnSyncViewControls = [=]{
+        auto widgetDoc = this->widgetPageDocuments() ? this->widgetPageDocuments()->currentWidgetGuiDocument() : nullptr;
+        QSignalBlocker blockerDisplay(comboDisplay);
+        QSignalBlocker blockerBg(comboBackground);
+        if (widgetDoc) {
+            int idxDisplay = comboDisplay->findData(static_cast<int>(widgetDoc->modelDisplayMode()));
+            if (idxDisplay >= 0)
+                comboDisplay->setCurrentIndex(idxDisplay);
+
+            int idxBg = comboBackground->findData(static_cast<int>(widgetDoc->backgroundMode()));
+            if (idxBg >= 0)
+                comboBackground->setCurrentIndex(idxBg);
+        } else {
+            int idxDisplay = comboDisplay->findData(static_cast<int>(GuiDocument::defaultModelDisplayMode()));
+            if (idxDisplay >= 0)
+                comboDisplay->setCurrentIndex(idxDisplay);
+
+            int idxBg = comboBackground->findData(static_cast<int>(GuiDocument::defaultBackgroundMode()));
+            if (idxBg >= 0)
+                comboBackground->setCurrentIndex(idxBg);
+        }
+    };
+    fnSyncViewControls();
+
+    AppModule::get()->settings()->signalChanged.connectSlot([=](Property* prop){
+        if (prop == &AppModule::get()->properties()->unitSystemSchema) {
+            fnUpdateUnitButton();
+            fnUpdateStatus();
+        }
+    });
+
+    if (this->widgetPageDocuments()) {
+        QObject::connect(this->widgetPageDocuments(), &WidgetMainControl::currentDocumentIndexChanged, this, [=]{
+            fnUpdateStatus();
+            fnSyncViewControls();
+        });
     }
 }
 

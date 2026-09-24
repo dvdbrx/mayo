@@ -136,6 +136,28 @@ public:
     int aisViewCubeBoundingSize() const;
     static bool isAisViewCubeObject(const GraphicsObjectPtr& gfxObject);
 
+    // -- Background Mode
+    enum class BackgroundMode {
+        Gradient,
+        Dark,
+        Light
+    };
+    BackgroundMode backgroundMode() const { return m_backgroundMode; }
+    void setBackgroundMode(BackgroundMode mode);
+    static BackgroundMode defaultBackgroundMode();
+    static void setDefaultBackgroundMode(BackgroundMode mode);
+
+    // -- Model Display Mode
+    enum class ModelDisplayMode {
+        Solid,
+        Wireframe,
+        Transparent
+    };
+    ModelDisplayMode modelDisplayMode() const { return m_modelDisplayMode; }
+    void setModelDisplayMode(ModelDisplayMode mode);
+    static ModelDisplayMode defaultModelDisplayMode();
+    static void setDefaultModelDisplayMode(ModelDisplayMode mode);
+
     // -- Background
     struct GradientBackground {
         Quantity_Color color1;
@@ -144,6 +166,7 @@ public:
     };
     static const GradientBackground& defaultGradientBackground();
     static void setDefaultGradientBackground(const GradientBackground& gradientBkgnd);
+
 
     // Signals
     using MapVisibilityByTreeNodeId = std::unordered_map<TreeNodeId, CheckState>;
@@ -203,6 +226,9 @@ private:
     std::unordered_map<TreeNodeId, CheckState> m_mapTreeNodeCheckState;
 
     double m_explodingFactor = 0.;
+    BackgroundMode m_backgroundMode = BackgroundMode::Gradient;
+    ModelDisplayMode m_modelDisplayMode = ModelDisplayMode::Solid;
 };
+
 
 } // namespace Mayo

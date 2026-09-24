@@ -1,0 +1,20 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION (( 'STEP AP203' ),
+    '1' );
+FILE_NAME ('QD02-05.STEP',
+    '2018-10-24T18:08:07',
+    ( '' ),
+    ( '' ),
+    'SwSTEP 2.0',
+    'SolidWorks 2018',
+    '' );
+FILE_SCHEMA (( 'CONFIG_CONTROL_DESIGN' ));
+ENDSEC;
+
+DATA;
+#1 = EDGE_LOOP ( 'NONE', ( #91, #281, #269, #25 ) ) ;
+#2 = AXIS2_PLACEMENT_3D ( 'NONE', #674, #87, #510 ) ;
+#3 = APPROVAL_PERSON_ORGANIZATION ( #248, #491, #538 ) ;
+#4 = APPROVAL_STATUS ( 'not_yet_approved' ) ;
+#5 = CIRCLE ( 'NONE', #367, 0.1659999999999999531 ) ;

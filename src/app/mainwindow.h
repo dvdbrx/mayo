@@ -56,7 +56,10 @@ public:
     // Registers callback invoked when the main window is closing with QWidget::closeEvent()
     void addOnCloseCallback(std::function<void()> fn);
 
+    TaskManager* taskMgr() { return &m_taskMgr; }
+
 protected:
+
     void showEvent(QShowEvent* event) override;
     void closeEvent(QCloseEvent* event) override;
 
@@ -65,6 +68,7 @@ private:
 
     void createCommands();
     void createMenus();
+    void createToolbarAndStatusBar();
     template<typename CmdType, typename... Args> void addCommand(Args&&... args) {
         m_cmdContainer.addNamedCommand<CmdType>(std::forward<Args>(args)...);
     }

@@ -3,4 +3,8 @@ build-*
 *.user.*
 custom.pri
 env.pri
-cmake/CustomSteps.cmake
+dist/
+build/
+.deps/
+*.log
+

@@ -11,6 +11,11 @@
 
 #include <Standard_Version.hxx>
 
+#include <QtCore/QDir>
+#include <QtCore/QFileInfo>
+#include <QtCore/QUrl>
+#include <QtGui/QDesktopServices>
+
 namespace Mayo {
 
 DialogAbout::DialogAbout(QWidget* parent)
@@ -29,6 +34,17 @@ DialogAbout::DialogAbout(QWidget* parent)
     m_ui->label_BuildDateTime->setText(m_ui->label_BuildDateTime->text().arg(__DATE__, __TIME__));
     m_ui->label_Qt->setText(m_ui->label_Qt->text().arg(QT_VERSION_STR));
     m_ui->label_Occ->setText(m_ui->label_Occ->text().arg(OCC_VERSION_COMPLETE));
+
+    auto labelThirdParty = new QLabel(this);
+    labelThirdParty->setText(tr("<a href=\"third_party\">Third-Party Licenses</a>"));
+    labelThirdParty->setTextInteractionFlags(Qt::TextBrowserInteraction);
+    QObject::connect(labelThirdParty, &QLabel::linkActivated, this, []{
+        QString docPath = QCoreApplication::applicationDirPath() + "/THIRD_PARTY.md";
+        if (!QFileInfo::exists(docPath))
+            docPath = QDir::currentPath() + "/THIRD_PARTY.md";
+        QDesktopServices::openUrl(QUrl::fromLocalFile(docPath));
+    });
+    m_ui->layout_Infos->addWidget(labelThirdParty);
 }
 
 DialogAbout::~DialogAbout()

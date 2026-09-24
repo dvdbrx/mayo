@@ -6,6 +6,7 @@
 #pragma once
 
 #include "../base/document.h"
+#include "../gui/gui_document.h"
 #include "theme.h"
 #include "widget_occ_view_controller.h"
 
@@ -17,7 +18,6 @@ class QMenu;
 namespace Mayo {
 
 class ButtonFlat;
-class GuiDocument;
 class IWidgetOccView;
 class WidgetClipPlanes;
 class WidgetExplodeAssembly;
@@ -39,7 +39,20 @@ public:
 
     QColor panelBackgroundColor() const;
 
+    void triggerFitAll();
+    void toggleClipPlanes(bool on);
+    void toggleMeasure(bool on);
+    bool isClipPlanesActive() const;
+    bool isMeasureActive() const;
+
+    void setBackgroundMode(GuiDocument::BackgroundMode mode);
+    GuiDocument::BackgroundMode backgroundMode() const;
+
+    void setModelDisplayMode(GuiDocument::ModelDisplayMode mode);
+    GuiDocument::ModelDisplayMode modelDisplayMode() const;
+
 protected:
+
     void resizeEvent(QResizeEvent* event) override;
 
 private:

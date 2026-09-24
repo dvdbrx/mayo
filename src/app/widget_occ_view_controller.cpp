@@ -84,7 +84,7 @@ WidgetOccViewController::WidgetOccViewController(IWidgetOccView* occView)
     : QObject(occView->widget()),
       V3dViewController(occView->v3dView()),
       m_occView(occView),
-      m_navigStyle(View3dNavigationStyle::Catia),
+      m_navigStyle(View3dNavigationStyle::SolidWorks),
       m_actionMatcher(createActionMatcher(m_navigStyle, m_inputSequence))
 {
     m_occView->widget()->installEventFilter(this);
