@@ -128,13 +128,23 @@ void ButtonFlat::paintEvent(QPaintEvent*)
     const QRect surface(0, 0, frame.width(), frame.height());
     //const QPoint mousePos = this->mapFromGlobal(QCursor::pos());
     const bool isEnabled = this->isEnabled();
+    painter.setRenderHint(QPainter::Antialiasing);
 
-    if (isEnabled && this->isChecked())
-        painter.fillRect(surface, m_checkedBrush);
-    else if (isEnabled && m_isMouseHover)
-        painter.fillRect(surface, m_hoverBrush);
-    else
+    if (isEnabled && this->isChecked()) {
+        const QRectF btnRect = surface.adjusted(2, 2, -2, -2);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(m_checkedBrush);
+        painter.drawRoundedRect(btnRect, 4.0, 4.0);
+    }
+    else if (isEnabled && m_isMouseHover) {
+        const QRectF btnRect = surface.adjusted(2, 2, -2, -2);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(m_hoverBrush);
+        painter.drawRoundedRect(btnRect, 4.0, 4.0);
+    }
+    else if (this->backgroundBrush().color() != Qt::transparent) {
         painter.fillRect(surface, this->backgroundBrush());
+    }
 
     const QRect iconRect(
         (surface.width() - m_iconSize.width()) / 2,

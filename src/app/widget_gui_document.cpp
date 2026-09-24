@@ -21,6 +21,7 @@
 #include "qtwidgets_utils.h"
 
 #include <QtGui/QPainter>
+#include <QtGui/QPainterPath>
 #include <QtGui/QGuiApplication>
 #include <QtWidgets/QBoxLayout>
 #include <QtWidgets/QMenu>
@@ -43,10 +44,15 @@ protected:
     void paintEvent(QPaintEvent*) override
     {
         QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
         const QRect frame = this->frameGeometry();
-        const QRect surface(0, 0, frame.width(), frame.height());
+        const QRectF surface(0.5, 0.5, frame.width() - 1.0, frame.height() - 1.0);
         auto widgetGuiDocument = static_cast<const WidgetGuiDocument*>(this->parentWidget());
-        painter.fillRect(surface, widgetGuiDocument->panelBackgroundColor());
+        QPainterPath path;
+        path.addRoundedRect(surface, 6.0, 6.0);
+        painter.fillPath(path, widgetGuiDocument->panelBackgroundColor());
+        painter.setPen(QPen(QColor(42, 53, 73, 190), 1.0));
+        painter.drawPath(path);
     }    
 };
 
@@ -172,9 +178,12 @@ Document::Identifier WidgetGuiDocument::documentIdentifier() const
 
 QColor WidgetGuiDocument::panelBackgroundColor() const
 {
-    QColor color = mayoTheme()->color(Theme::Color::Palette_Window);
+    QColor color = mayoTheme()->color(Theme::Color::ButtonView3d_Background);
+    if (!color.isValid())
+        color = mayoTheme()->color(Theme::Color::Palette_Window);
+
     if (m_qtOccView->supportsWidgetOpacity())
-        color.setAlpha(175);
+        color.setAlpha(215);
 
     return color;
 }
@@ -329,7 +338,7 @@ QMenu* WidgetGuiDocument::createViewMenu(QWidget* parent) const
     auto menu = new QMenu(parent);
     menu->setStyle(menuStyle);
     const QString strPanelBkgndColor = this->panelBackgroundColor().name(QColor::HexArgb);
-    menu->setStyleSheet(QString("QMenu { background:%1; border: 0px }").arg(strPanelBkgndColor));
+    menu->setStyleSheet(QString("QMenu { background:%1; border: 1px solid #283347; border-radius: 6px; padding: 4px; }").arg(strPanelBkgndColor));
     menu->setWindowFlags(menu->windowFlags() | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint);
     if (m_qtOccView->supportsWidgetOpacity())
         menu->setAttribute(Qt::WA_TranslucentBackground);

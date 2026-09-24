@@ -486,7 +486,9 @@ void GuiDocument::setViewTrihedronMode(ViewTrihedronMode mode)
         if (m_aisViewCube.IsNull()) {
             auto aisViewCube = makeOccHandle<AIS_ViewCube>();
             m_aisViewCube = aisViewCube;
-            aisViewCube->SetBoxColor(Quantity_NOC_GRAY75);
+            aisViewCube->SetBoxColor(Quantity_Color(0.12, 0.15, 0.20, Quantity_TOC_sRGB));
+            aisViewCube->SetInnerColor(Quantity_Color(0.08, 0.10, 0.14, Quantity_TOC_sRGB));
+            aisViewCube->SetTextColor(Quantity_Color(0.85, 0.92, 0.98, Quantity_TOC_sRGB));
             //aisViewCube->SetFixedAnimationLoop(false);
             aisViewCube->SetAxesLabels("", "", "");
             this->configureViewCubeSizes();
@@ -617,7 +619,7 @@ void GuiDocument::setBackgroundMode(BackgroundMode mode)
         m_v3dView->SetBgGradientStyle(Aspect_GFM_NONE, false);
     }
     else if (mode == BackgroundMode::Dark) {
-        const Quantity_Color color(0.12, 0.13, 0.15, Quantity_TOC_sRGB);
+        const Quantity_Color color(0.06, 0.08, 0.11, Quantity_TOC_sRGB);
         m_v3dView->SetBackgroundColor(color);
         m_v3dView->SetBgGradientColors(color, color, Aspect_GFM_VER, false);
         m_v3dView->SetBgGradientStyle(Aspect_GFM_NONE, false);
